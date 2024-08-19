@@ -1,0 +1,15 @@
+# training 
+
+epochs: 150
+csv_file: "nasdaq100_padding.csv"
+target: "NDX"
+batch_size: 128
+
+timesteps: 10
+m_dim: 64
+p_dim: 64
+num_exogenous: 81
+
+lr: 0.0001
+train_split: 0.85
+val_split: 0.06

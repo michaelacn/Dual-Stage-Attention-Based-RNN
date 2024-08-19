@@ -1,0 +1,8 @@
+matplotlib==3.9.1
+numpy==1.26.4
+pandas==2.2.2
+torch==2.3.1
+tensorboard==2.17.0
+tensorboard-data-server==0.7.2
+easydict==1.13
+tqdm==4.66.4
