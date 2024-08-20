@@ -10,19 +10,19 @@ def get_data_and_preprocess(csv_path, target, timesteps, train_split, val_split,
     Preprocess time series data by creating sequences, applying min-max scaling, and splitting into training, validation, and test sets with a specified prediction horizon.
     """
     data = pd.read_csv(csv_path)
-    n_timeseries = data.shape[1] - 1
+    n_exogenous = data.shape[1] - 1
 
     # Placeholders
-    X = np.zeros((len(data), timesteps, n_timeseries))
+    X = np.zeros((len(data), timesteps, n_exogenous))
     y = np.zeros((len(data), timesteps, 1))
 
     # Fill X and y
     for i, name in enumerate(data.columns[:-1]):
         for j in range(timesteps):
-            X[:, j, i] = data[name].shift(timesteps - j - 1).fillna(method="bfill")
-            y[:, j, 0] = data[target].shift(timesteps - j - 1).fillna(method="bfill")
+            X[:, j, i] = data[name].shift(timesteps - j - 1).bfill()
+            y[:, j, 0] = data[target].shift(timesteps - j - 1).bfill()
 
-    target_shifted = data[target].shift(-prediction_horizon).fillna(method="ffill").values
+    target_shifted = data[target].shift(-prediction_horizon).ffill().values
 
     # Split the data
     train_len = int(len(data) * train_split)
@@ -66,7 +66,7 @@ def get_dataloader(args):
     """
     Create and return DataLoader objects for training, validation, and testing.
     """
-    data = get_data_and_preprocess(args.csv_file, args.target, args.timesteps, args.train_split, args.val_split)
+    data = get_data_and_preprocess(args.csv_file, args.target, args.timesteps, args.train_split, args.val_split, args.prediction_horizon)
     X_train_t, X_val_t, X_test_t, y_his_train_t, y_his_val_t, y_his_test_t, target_train_t, target_val_t, target_test_t = data
 
     train_loader = DataLoader(

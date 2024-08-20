@@ -1,15 +1,15 @@
 import os 
 from easydict import EasyDict as edict
 import yaml
-import json 
+import json
+import errno
 
 
 class Loader(yaml.SafeLoader):
-    """YAML Loader with `!include` constructor."""
-
+    """
+    YAML Loader with `!include` constructor.
+    """
     def __init__(self, stream) -> None:
-        """Initialise Loader."""
-
         try:
             self._root = os.path.split(stream.name)[0]
         except AttributeError:
@@ -17,9 +17,11 @@ class Loader(yaml.SafeLoader):
 
         super().__init__(stream)
 
-def construct_include(loader, node: yaml.Node):
-    """Include file referenced at node."""
 
+def construct_include(loader, node: yaml.Node):
+    """
+    Include file referenced at node.
+    """
     filename = os.path.abspath(os.path.join(loader._root, loader.construct_scalar(node)))
     extension = os.path.splitext(filename)[1].lstrip('.')
 
@@ -42,3 +44,13 @@ def get_config(config_path):
     config.name = config_name
     return config
 
+
+def create_checkpoint_directory(checkpoint_path):
+    """
+    Create a checkpoint directory if it doesn't exist.
+    """
+    try:
+        os.mkdir(checkpoint_path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise RuntimeError('Unable to create checkpoint directory:', checkpoint_path)
