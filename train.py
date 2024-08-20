@@ -1,9 +1,4 @@
-import os 
-import random 
 import argparse
-import errno
-import time
-import copy 
 from tqdm import tqdm 
 
 from lib.models.models import DARNN 
@@ -34,7 +29,7 @@ def parse_args():
     return opts
 
 
-def get_model(args): 
+def get_model(args, device): 
     model = DARNN(
         T = args.timesteps, 
         m = args.m_dim, 
@@ -46,94 +41,63 @@ def get_model(args):
     return model
 
 
-def train_with_config(args, opts): 
+def train_with_config(args, opts, device):
+    """
+    Train the model using the provided configuration and options.
+    """
 
-    try: 
-        os.mkdir(opts.checkpoint)
-    except OSError as e: 
-        if e.errno != errno.EEXIST:
-            raise RuntimeError('Unable to create checkpoint directory:', opts.checkpoint)
-        
+    # Create checkpoint directory if it doesn't exist
+    create_checkpoint_directory(opts.checkpoint)
+
+    # Initialize TensorBoard writer
     train_writer = SummaryWriter(os.path.join(opts.checkpoint, "logs"))
 
+    # Load data, model, and training utilities
     train_loader, val_loader, test_loader = get_dataloader(args)
-    model = get_model(args)
-    criterion = get_criterion(args)
+    model = get_model(args, device)
+    criterion = get_criterion(device)
     optimizer, scheduler = get_optimizer(args, model)
 
+    # Display model parameter count
+    model_params = sum(p.numel() for p in model.parameters())
+    print(f'[INFO]: Trainable parameter count: {model_params}')
+
+    # Initialize minimum loss
     min_loss = np.inf
-    model_params = 0
-    for parameter in model.parameters():
-        model_params = model_params + parameter.numel()
-    print('INFO: Trainable parameter count:', model_params)
 
-    for epoch in tqdm(range(args.epochs)): 
-        print('Training epoch %d.' % epoch)
+    # Main training loop
+    for epoch in tqdm(range(args.epochs)):
+        print(f'Training epoch {epoch}.')
 
-        losses = {}
-        losses["train_MSE_loss"] = AverageMeter()
-        losses["val_MSE_loss"] = AverageMeter()
-        losses["val_MAE_loss"] = AverageMeter()
-        losses["val_RMSE_loss"] = AverageMeter()
-        losses["val_MAPE_loss"] = AverageMeter()
-        losses["test_MSE_loss"] = AverageMeter()
-        losses["test_MAE_loss"] = AverageMeter()
-        losses["test_RMSE_loss"] = AverageMeter()
-        losses["test_MAPE_loss"] = AverageMeter()
-        train_epoch(args, opts, model, train_loader, criterion, optimizer, scheduler, losses, epoch) 
-        model, gt, pred = validate_epoch(args, opts, model, val_loader, criterion, losses, epoch, mode="val")
-        
-        # logs
-        lr = optimizer.param_groups[0]['lr']
-        train_writer.add_scalar("train_MSE_loss", losses["train_MSE_loss"].avg, epoch + 1)
-        train_writer.add_scalar("val_MSE_loss", losses["val_MSE_loss"].avg, epoch + 1)
-        train_writer.add_scalar("lr", lr, epoch + 1)
-        for i in range(len(gt)):
+        # Initialize loss trackers
+        losses = initialize_loss_trackers()
 
-            train_writer.add_scalars(
-                "validation_prediction", 
-                {
-                    "gt": gt[i], 
-                    "pred": pred[i]
-                }, 
-                i
-            )
-        chk_path_latest = os.path.join(opts.checkpoint, 'latest_epoch.bin')
-        chk_path_best = os.path.join(opts.checkpoint, 'best_epoch.bin'.format(epoch))
+        # Train for one epoch
+        train_epoch(model, device, train_loader, criterion, optimizer, scheduler, losses)
 
-        save_checkpoint(chk_path_latest, epoch, lr, optimizer, scheduler, model, min_loss)
-        if losses["val_RMSE_loss"].avg < min_loss: 
-            min_loss = losses["val_RMSE_loss"].avg
-            save_checkpoint(chk_path_best, epoch, lr, optimizer, scheduler, model, min_loss)
+        # Validate the model after each epoch
+        model, gt, pred = validate_epoch(model, device, val_loader, criterion, losses, mode="val")
 
-    print("[INFO] : Training done. ")
-    print("[INFO] : Performing inference on test data") 
-    model, gt, pred = validate_epoch(args, opts, model, test_loader, criterion, losses, epoch, mode="test")
-    for i in range(len(gt)):
-        train_writer.add_scalars(
-            "test_prediction", 
-            {
-                "gt": gt[i], 
-                "pred": pred[i]
-            }, 
-            i
-        )
+        # Log metrics to TensorBoard
+        log_metrics(train_writer, losses, optimizer, gt, pred, epoch)
 
+        # Save checkpoints
+        save_checkpoints(opts.checkpoint, model, optimizer, scheduler, epoch, losses, min_loss)
+        min_loss = min(min_loss, losses["val_RMSE_loss"].avg)
 
-    train_writer.add_scalar("test_MSE_loss", losses["test_MSE_loss"].avg, 0)
-    train_writer.add_scalar("test_MAE_loss", losses["test_MAE_loss"].avg, 0)
-    train_writer.add_scalar("test_RMSE_loss", losses["test_RMSE_loss"].avg, 0)
-    train_writer.add_scalar("test_MAPE_loss", losses["test_MAPE_loss"].avg, 0)
- 
+    print("[INFO] : Training done.")
+    print("[INFO] : Performing inference on test data")
 
-def set_random_seed(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+    # Perform inference on the test set
+    model, gt, pred = validate_epoch(model, device, test_loader, criterion, losses, mode="test")
+
+    # Log test results to TensorBoard
+    log_test_results(train_writer, losses, gt, pred)
 
 
 if __name__ == "__main__": 
     opts = parse_args()
     set_random_seed(opts.seed)
     args = get_config(opts.config)
-    train_with_config(args, opts)
+    train_with_config(args, opts, device)
+
