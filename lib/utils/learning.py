@@ -140,8 +140,6 @@ def save_checkpoint(chk_path, epoch, lr, optimizer, scheduler, model, min_loss):
     Save the current training state, including model, optimizer, scheduler, and metrics, to a checkpoint file.
     """
     model.eval()
-
-    print("[INFO]: Saving model checkpoint")
     torch.save({
         'epoch': epoch + 1,
         'lr': lr,
@@ -160,8 +158,11 @@ def save_checkpoints(checkpoint_dir, model, optimizer, scheduler, epoch, losses,
     chk_path_best = os.path.join(checkpoint_dir, 'best_epoch.bin')
 
     save_checkpoint(chk_path_latest, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, min_loss)
+    print("[INFO LOG]: Saving model checkpoint")
     if losses["val_RMSE_loss"].avg < min_loss:
         save_checkpoint(chk_path_best, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, losses["val_RMSE_loss"].avg)
+        print("[INFO LOG]: Best model checkpoint saved")
+
 
 
 def log_metrics(writer, losses, optimizer, gt, pred, epoch):

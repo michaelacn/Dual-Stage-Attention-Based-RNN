@@ -29,9 +29,7 @@ def get_data_and_preprocess(csv_path, target, timesteps, train_split, val_split,
     val_len = int(len(data) * val_split)
     test_len = len(data) - train_len - val_len
 
-    print("TRAIN LENGTH: ", train_len)
-    print("VALIDATION LENGTH: ", val_len)
-    print("TEST LENGTH: ", test_len)
+    print(f"[INFO DATA] Train Length: {train_len} | Validation Length: {val_len} | Test lenght: {test_len}")
 
     X_train, X_val, X_test = X[:train_len], X[train_len:train_len+val_len], X[train_len+val_len:]
     y_train, y_val, y_test = y[:train_len], y[train_len:train_len+val_len], y[train_len+val_len:]
