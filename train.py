@@ -37,7 +37,6 @@ def get_model(args, device):
         n = args.num_exogenous
     )
     model.to(device)
-    print(f"[INFO] : Running model on device : {device}")
     return model
 
 
@@ -45,7 +44,10 @@ def train_with_config(args, opts, device):
     """
     Train the model using the provided configuration and options.
     """
-
+    print('--------------------------------------------')
+    print('######## INITIATING DARNN TRAINING ########')
+    print('--------------------------------------------')
+    
     # Create checkpoint directory if it doesn't exist
     create_checkpoint_directory(opts.checkpoint)
 
@@ -60,14 +62,14 @@ def train_with_config(args, opts, device):
 
     # Display model parameter count
     model_params = sum(p.numel() for p in model.parameters())
-    print(f'[INFO]: Trainable parameter count: {model_params}')
+    print(f'[INFO MODEL] Trainable parameter count: {model_params} | Device: {device}')
 
     # Initialize minimum loss
     min_loss = np.inf
 
     # Main training loop
     for epoch in tqdm(range(args.epochs)):
-        print(f'Training epoch {epoch}.')
+        print(f'[INFO TRAIN] Epoch {epoch}.')
 
         # Initialize loss trackers
         losses = initialize_loss_trackers()
@@ -85,8 +87,7 @@ def train_with_config(args, opts, device):
         save_checkpoints(opts.checkpoint, model, optimizer, scheduler, epoch, losses, min_loss)
         min_loss = min(min_loss, losses["val_RMSE_loss"].avg)
 
-    print("[INFO] : Training done.")
-    print("[INFO] : Performing inference on test data")
+    print("[INFO] Training done, performing inference on test data.")
 
     # Perform inference on the test set
     model, gt, pred = validate_epoch(model, device, test_loader, criterion, losses, mode="test")
