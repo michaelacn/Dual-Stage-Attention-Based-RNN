@@ -102,12 +102,14 @@ def train_epoch(model, device, train_loader, criterion, optimizer, scheduler, lo
         scheduler.step()  # Update learning rate with scheduler (if applicable)
 
 
-def validate_epoch(model, device, val_loader, criterion, losses, mode="val"):
-    """Evaluate the model on the validation set, updating loss metrics and returning predictions."""
+def evaluate_model(model, device, val_loader, criterion, losses, mode="val"):
+    """
+    Evaluate the model on the validation/test set, update loss metrics, and return predictions.
+    """
     model.eval()
     pred, gt = [], []
 
-    with torch.no_grad(): 
+    with torch.inference_mode(): 
         for x, y_known, target in val_loader:  
             x, y_known, target = x.to(device), y_known.to(device), target.to(device)[:, None] # Move to device
 
@@ -144,7 +146,7 @@ def save_checkpoint(chk_path, epoch, lr, optimizer, scheduler, model, min_loss):
         'epoch': epoch + 1,
         'lr': lr,
         'optimizer': optimizer.state_dict(),
-        'model': model.state_dict(),
+        'model_state_dict': model.state_dict(),
         'min_loss': min_loss,
         'scheduler': scheduler.state_dict()
     }, chk_path)
@@ -162,7 +164,6 @@ def save_checkpoints(checkpoint_dir, model, optimizer, scheduler, epoch, losses,
     if losses["val_RMSE_loss"].avg < min_loss:
         save_checkpoint(chk_path_best, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, losses["val_RMSE_loss"].avg)
         print("[INFO LOG]: Best model checkpoint saved")
-
 
 
 def log_metrics(writer, losses, optimizer, gt, pred, epoch):

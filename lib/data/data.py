@@ -5,15 +5,15 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 
-def get_data_and_preprocess(csv_path, target, timesteps, train_split, val_split, prediction_horizon):
+def get_data_and_preprocess(csv_path, target, timesteps, train_split, val_split):
     """
-    Preprocess time series data by creating sequences, applying min-max scaling, and splitting into training, validation, and test sets with a specified prediction horizon.
+    Preprocess time series data by creating sequences, applying min-max scaling, and splitting into training, validation, and test sets.
     """
     data = pd.read_csv(csv_path)
-    n_exogenous = data.shape[1] - 1
+    num_exogenous = data.shape[1] - 1
 
     # Placeholders
-    X = np.zeros((len(data), timesteps, n_exogenous))
+    X = np.zeros((len(data), timesteps, num_exogenous))
     y = np.zeros((len(data), timesteps, 1))
 
     # Fill X and y
@@ -22,14 +22,13 @@ def get_data_and_preprocess(csv_path, target, timesteps, train_split, val_split,
             X[:, j, i] = data[name].shift(timesteps - j - 1).bfill()
             y[:, j, 0] = data[target].shift(timesteps - j - 1).bfill()
 
-    target_shifted = data[target].shift(-prediction_horizon).ffill().values
+    # Prediction horizon equals to 1
+    target_shifted = data[target].shift(-1).ffill().values
 
     # Split the data
     train_len = int(len(data) * train_split)
     val_len = int(len(data) * val_split)
     test_len = len(data) - train_len - val_len
-
-    print(f"[INFO DATA] Train Length: {train_len} | Validation Length: {val_len} | Test lenght: {test_len}")
 
     X_train, X_val, X_test = X[:train_len], X[train_len:train_len+val_len], X[train_len+val_len:]
     y_train, y_val, y_test = y[:train_len], y[train_len:train_len+val_len], y[train_len+val_len:]
@@ -60,32 +59,30 @@ def get_data_and_preprocess(csv_path, target, timesteps, train_split, val_split,
     return to_tensor(X_train, X_val, X_test, y_train, y_val, y_test, target_train, target_val, target_test)
 
 
-def get_dataloader(args):
+def get_dataloader(args, mode):
     """
     Create and return DataLoader objects for training, validation, and testing.
     """
-    data = get_data_and_preprocess(args.csv_file, args.target, args.timesteps, args.train_split, args.val_split, args.prediction_horizon)
+    data = get_data_and_preprocess(args.csv_file, args.target, args.timesteps, args.train_split, args.val_split)
     X_train_t, X_val_t, X_test_t, y_his_train_t, y_his_val_t, y_his_test_t, target_train_t, target_val_t, target_test_t = data
 
-    train_loader = DataLoader(
-        TensorDataset(X_train_t, y_his_train_t, target_train_t), 
-        shuffle=True, 
-        batch_size=args.batch_size
-    )
+    if mode == 'val':
+        train_dataset = TensorDataset(X_train_t, y_his_train_t, target_train_t)
+        val_dataset = TensorDataset(X_val_t, y_his_val_t, target_val_t)
 
-    val_loader = DataLoader(
-        TensorDataset(X_val_t, y_his_val_t, target_val_t), 
-        shuffle=False, 
-        batch_size=args.batch_size
-    )
+        print(f"[INFO DATA] Train Length: {len(train_dataset)} | Validation Length: {len(val_dataset)}")
 
-    test_loader = DataLoader(
-        TensorDataset(X_test_t, y_his_test_t, target_test_t), 
-        shuffle=False, 
-        batch_size=args.batch_size
-    )
+        train_loader = DataLoader(train_dataset, shuffle=True, batch_size=args.batch_size)
+        val_loader = DataLoader(val_dataset, shuffle=False, batch_size=args.batch_size)
+        return train_loader, val_loader
+    
+    elif mode == 'test':
+        test_dataset = TensorDataset(X_test_t, y_his_test_t, target_test_t)
 
-    return train_loader, val_loader, test_loader
+        print(f"[INFO DATA] Test Length: {len(test_dataset)}")
+
+        test_loader = DataLoader(test_dataset, shuffle=False, batch_size=args.batch_size)
+        return test_loader
 
 
 
