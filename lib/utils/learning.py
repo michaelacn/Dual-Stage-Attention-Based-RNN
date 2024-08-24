@@ -33,21 +33,26 @@ class AverageMeter(object):
         self.avg = self.sum / self.count
 
 
-def initialize_loss_trackers():
+def initialize_loss_trackers(mode):
     """
     Initialize loss trackers for training, validation, and test.
     """
-    return {
-        "train_MSE_loss": AverageMeter(),
-        "val_MSE_loss": AverageMeter(),
-        "val_MAE_loss": AverageMeter(),
-        "val_RMSE_loss": AverageMeter(),
-        "val_MAPE_loss": AverageMeter(),
-        "test_MSE_loss": AverageMeter(),
-        "test_MAE_loss": AverageMeter(),
-        "test_RMSE_loss": AverageMeter(),
-        "test_MAPE_loss": AverageMeter(),
-    }
+    if mode == 'val':
+        return {
+            "train_MSE_loss": AverageMeter(),
+            "val_MSE_loss": AverageMeter(),
+            "val_MAE_loss": AverageMeter(),
+            "val_RMSE_loss": AverageMeter(),
+            "val_MAPE_loss": AverageMeter(),
+        }
+    elif mode =='test':
+        return {
+            "test_MSE_loss": AverageMeter(),
+            "test_MAE_loss": AverageMeter(),
+            "test_RMSE_loss": AverageMeter(),
+            "test_MAPE_loss": AverageMeter(),
+        }
+
 
 
 def mape(y_true, y_pred): 
@@ -137,9 +142,9 @@ def evaluate_model(model, device, val_loader, criterion, losses, mode="val"):
 
 
 
-def save_checkpoint(chk_path, epoch, lr, optimizer, scheduler, model, min_loss):
+def save_training_state(file_path, epoch, lr, optimizer, scheduler, model, min_loss):
     """
-    Save the current training state, including model, optimizer, scheduler, and metrics, to a checkpoint file.
+    Save the current training state, including model, optimizer, scheduler, and metrics, to a file.
     """
     model.eval()
     torch.save({
@@ -149,21 +154,29 @@ def save_checkpoint(chk_path, epoch, lr, optimizer, scheduler, model, min_loss):
         'model_state_dict': model.state_dict(),
         'min_loss': min_loss,
         'scheduler': scheduler.state_dict()
-    }, chk_path)
+    }, file_path)
 
 
-def save_checkpoints(checkpoint_dir, model, optimizer, scheduler, epoch, losses, min_loss):
+def manage_checkpoints(checkpoint_dir, model, optimizer, scheduler, epoch, losses, min_loss):
     """
-    Save the model checkpoints during training.
+    Handle the saving of model checkpoints during training and log the progress in validation RMSE.
     """
-    chk_path_latest = os.path.join(checkpoint_dir, 'latest_epoch.bin')
-    chk_path_best = os.path.join(checkpoint_dir, 'best_epoch.bin')
+    latest_checkpoint_path = os.path.join(checkpoint_dir, 'latest_epoch.bin')
+    best_checkpoint_path = os.path.join(checkpoint_dir, 'best_epoch.bin')
 
-    save_checkpoint(chk_path_latest, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, min_loss)
-    print("[INFO LOG]: Saving model checkpoint")
-    if losses["val_RMSE_loss"].avg < min_loss:
-        save_checkpoint(chk_path_best, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, losses["val_RMSE_loss"].avg)
-        print("[INFO LOG]: Best model checkpoint saved")
+    save_training_state(latest_checkpoint_path, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, min_loss)
+    print("[INFO LOG] Latest model checkpoint saved")
+
+    current_rmse_loss = losses["val_RMSE_loss"].avg
+
+    if current_rmse_loss < min_loss:
+        if min_loss == np.inf:
+            print(f"[INFO LOG] Best model checkpoint saved")
+        else:
+            improvement = ((min_loss - current_rmse_loss) / min_loss) * 100
+            print(f"[INFO LOG] Best model checkpoint saved | Validation RMSE reduced by {improvement:.2f}%")
+
+        save_training_state(best_checkpoint_path, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, current_rmse_loss)
 
 
 def log_metrics(writer, losses, optimizer, gt, pred, epoch):
