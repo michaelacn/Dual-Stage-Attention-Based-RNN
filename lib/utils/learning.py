@@ -4,13 +4,7 @@ import random
 import os
 
 
-def set_random_seed(seed):
-    """
-    Set the random seed for reproducibility across Python, NumPy, and PyTorch.
-    """
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+### Model Training and Evaluation Utilities ###
 
 
 class AverageMeter(object):
@@ -31,6 +25,15 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+
+def set_random_seed(seed):
+    """
+    Set the random seed for reproducibility across Python, NumPy, and PyTorch.
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
 def initialize_loss_trackers(mode):
@@ -54,14 +57,12 @@ def initialize_loss_trackers(mode):
         }
 
 
-
 def mape(y_true, y_pred): 
     """
     MAPE score.
     """
     epsilon = 1e-10  # To prevent division by zero
     return torch.mean(torch.abs((y_true - y_pred) / (y_true + epsilon))) * 100
-
 
 
 def lr_lambda(iteration):
@@ -141,6 +142,8 @@ def evaluate_model(model, device, val_loader, criterion, losses, mode="val"):
     return model, gt, pred
 
 
+### Model Checkpointing and Performance Logging ###
+
 
 def save_training_state(file_path, epoch, lr, optimizer, scheduler, model, min_loss):
     """
@@ -165,17 +168,15 @@ def manage_checkpoints(checkpoint_dir, model, optimizer, scheduler, epoch, losse
     best_checkpoint_path = os.path.join(checkpoint_dir, 'best_epoch.bin')
 
     save_training_state(latest_checkpoint_path, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, min_loss)
+    if min_loss == np.inf:
+        print(f"[INFO LOG] Initial model checkpoint saved")
+        return
     print("[INFO LOG] Latest model checkpoint saved")
 
     current_rmse_loss = losses["val_RMSE_loss"].avg
-
     if current_rmse_loss < min_loss:
-        if min_loss == np.inf:
-            print(f"[INFO LOG] Best model checkpoint saved")
-        else:
-            improvement = ((min_loss - current_rmse_loss) / min_loss) * 100
-            print(f"[INFO LOG] Best model checkpoint saved | Validation RMSE reduced by {improvement:.2f}%")
-
+        improvement = ((min_loss - current_rmse_loss) / min_loss) * 100
+        print(f"[INFO LOG] Best model checkpoint saved | Validation RMSE reduced by {improvement:.2f}%")
         save_training_state(best_checkpoint_path, epoch, optimizer.param_groups[0]['lr'], optimizer, scheduler, model, current_rmse_loss)
 
 

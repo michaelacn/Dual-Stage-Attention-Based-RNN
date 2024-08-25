@@ -35,6 +35,9 @@ def construct_include(loader, node: yaml.Node):
 
 
 def get_config(config_path):
+    """
+    Loads and processes a YAML configuration file, converting it into an extended dictionary.
+    """
     yaml.add_constructor('!include', construct_include, Loader)
     with open(config_path, 'r') as stream:
         config = yaml.load(stream, Loader=Loader)
