@@ -1,6 +1,6 @@
 # Dual-Stage-Attention-Based-RNN
 
-Develop a deep learning model for intraday time series forecasting, optimizing performance and tracking progress during training with TensorBoard integration.
+Develop a deep learning model for intraday time series forecasting, tracking progress during training with TensorBoard integration.
 
 
 # Table of Contents
